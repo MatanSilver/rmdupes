@@ -78,23 +78,25 @@ func main() {
 			fileinfos_map[fileinfo.Hash] = fileinfo.Path
 		} else {
 			/*
-				      log.Printf("[0]%s is a duplicate of [1]%s\nEnter [0,1] to pick a file to keep, or 2 to keep both", fileinfo.Path, fileinfos_map[fileinfo.Hash])
-							var input string
-							fmt.Scanln(&input)
-							choice, err := strconv.Atoi(input)
-							if err != nil {
-								log.Println("Error reading input: defaulting to keep both files")
-								choice = 2
-							}
+					      log.Printf("[0]%s is a duplicate of [1]%s\nEnter [0,1] to pick a file to keep, or 2 to keep both", fileinfo.Path, fileinfos_map[fileinfo.Hash])
+								var input string
+								fmt.Scanln(&input)
+								choice, err := strconv.Atoi(input)
+								if err != nil {
+									log.Println("Error reading input: defaulting to keep both files")
+									choice = 2
+								}
+
+				choice := 0
+				switch choice {
+				case 0:
+					os.Remove(fileinfo.Path)
+				case 1:
+					os.Remove(fileinfos_map[fileinfo.Hash])
+					fileinfos_map[fileinfo.Hash] = fileinfo.Path
+				}
 			*/
-			choice := 0
-			switch choice {
-			case 0:
-				os.Remove(fileinfo.Path)
-			case 1:
-				os.Remove(fileinfos_map[fileinfo.Hash])
-				fileinfos_map[fileinfo.Hash] = fileinfo.Path
-			}
+			os.Remove(fileinfo.Path)
 		}
 	}
 	//fmt.Printf("%v\n", fileinfos_map)
