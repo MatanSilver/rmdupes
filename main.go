@@ -19,12 +19,11 @@ type FileInfoWrapper struct {
 
 // Takes in a directory path. Recursively crawls the directory and outputs a
 // list of paths of files in that directory and subdirectories
-func ls(dir string) ([]FileInfoWrapper, int64) {
-	var totalsize int64 = 0
+func ls(dir string) []FileInfoWrapper {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if len(files) == 0 {
-			return []FileInfoWrapper{}, 0
+			return []FileInfoWrapper{}
 		}
 		log.Fatalf("Error reading directory: %v\n\t%v", dir, err)
 	}
@@ -35,8 +34,7 @@ func ls(dir string) ([]FileInfoWrapper, int64) {
 			log.Printf("Recursing into %s\n", file.Name())
 			if file.Name() != ".git" && file.Name() != ".DS_Store" { //kindly ignore .git folder to avoid spam
 				//log.Printf("entering directory: %s\n", file.Name())
-				newfileinfos, newtotalsize := ls(strings.Join([]string{dir, file.Name()}, "/"))
-				totalsize += newtotalsize
+				newfileinfos := ls(strings.Join([]string{dir, file.Name()}, "/"))
 				fileinfos = append(fileinfos, newfileinfos...)
 			}
 		} else {
@@ -45,7 +43,6 @@ func ls(dir string) ([]FileInfoWrapper, int64) {
 				log.Printf("\tSkipping large file %s\n", fullpath)
 				break
 			}
-			totalsize += file.Size()
 
 			//now we generate a hash, which might be useful for checking for
 			//duplicates
@@ -61,17 +58,19 @@ func ls(dir string) ([]FileInfoWrapper, int64) {
 			fileinfos = append(fileinfos, fileinfo)
 		}
 	}
-	return fileinfos, totalsize
+	return fileinfos
 }
 
 func RmDupes(dryrun bool) {
-	fileinfos, totalsize := ls(".")
+	fileinfos := ls(".")
 	fileinfos_map := map[string]string{} //hash to path
+	var totalsize int64 = 0
 	for _, fileinfo := range fileinfos {
 		if _, ok := fileinfos_map[fileinfo.Hash]; !ok {
 			fileinfos_map[fileinfo.Hash] = fileinfo.Path
 		} else {
 			log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.Path, fileinfos_map[fileinfo.Hash])
+			totalsize += fileinfo.Info.Size()
 			if !dryrun {
 				os.Remove(fileinfo.Path)
 			}
