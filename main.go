@@ -11,7 +11,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-type FileInfoWrapper struct {
+type fileinfowrapper struct {
 	Info os.FileInfo
 	Path string
 	Hash string
@@ -19,15 +19,15 @@ type FileInfoWrapper struct {
 
 // Takes in a directory path. Recursively crawls the directory and outputs a
 // list of paths of files in that directory and subdirectories
-func ls(dir string) []FileInfoWrapper {
+func ls(dir string) []fileinfowrapper {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if len(files) == 0 {
-			return []FileInfoWrapper{}
+			return []fileinfowrapper{}
 		}
 		log.Fatalf("Error reading directory: %v\n\t%v", dir, err)
 	}
-	var fileinfos []FileInfoWrapper
+	var fileinfos []fileinfowrapper
 	for _, file := range files {
 		if file.IsDir() {
 			//if the file is a directory, recursively add the directory's contents
@@ -54,15 +54,15 @@ func ls(dir string) []FileInfoWrapper {
 			hasher := sha256.New()
 			hasher.Write(buff)
 			//TODO possibly remove use of hex and just put to []byte
-			fileinfo := FileInfoWrapper{file, fullpath, hex.EncodeToString(hasher.Sum(nil))}
+			fileinfo := fileinfowrapper{file, fullpath, hex.EncodeToString(hasher.Sum(nil))}
 			fileinfos = append(fileinfos, fileinfo)
 		}
 	}
 	return fileinfos
 }
 
-func RmDupes(dryrun bool) {
-	fileinfos := ls(".")
+func RmDupes(dryrun bool, path string) {
+	fileinfos := ls(path)
 	fileinfos_map := map[string]string{} //hash to path
 	var totalsize int64 = 0
 	for _, fileinfo := range fileinfos {
@@ -87,10 +87,22 @@ func main() {
 			Name:  "dry-run",
 			Usage: "Only print logs of files to be deleted or errors",
 		},
+		cli.StringFlag{
+			Name:  "directory, d",
+			Usage: "Specify parent directory in which to remove duplicates",
+			Value: ".",
+		},
+		/*
+				cli.BoolFlag{
+					Name:	"recurse|r",
+					Usage:	"Recursively search for duplicates inside subdirectories",
+				},
+			}
+		*/
 	}
 	app.Usage = "Removes duplicate files by _content_"
 	app.Action = func(c *cli.Context) error {
-		RmDupes(c.Bool("dry-run"))
+		RmDupes(c.Bool("dry-run"), c.String("directory"))
 		return nil
 	}
 	app.Run(os.Args)
