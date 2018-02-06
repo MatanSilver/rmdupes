@@ -40,14 +40,16 @@ func ls(dir string) ([]FileInfoWrapper, int64) {
 				fileinfos = append(fileinfos, newfileinfos...)
 			}
 		} else {
-			if file.Size() > 256000000 {
-				log.Printf("Skipping large file %s\n", file.Name())
+			fullpath := strings.Join([]string{dir, file.Name()}, "/")
+			if file.Size() > 10000000 {
+				log.Printf("\tSkipping large file %s\n", fullpath)
 				break
 			}
 			totalsize += file.Size()
-			fullpath := strings.Join([]string{dir, file.Name()}, "/")
+
 			//now we generate a hash, which might be useful for checking for
 			//duplicates
+			log.Printf("\tHashing file %s\n", fullpath)
 			buff, err := ioutil.ReadFile(fullpath)
 			if err != nil {
 				log.Fatal(err)
@@ -64,12 +66,12 @@ func ls(dir string) ([]FileInfoWrapper, int64) {
 
 func RmDupes(dryrun bool) {
 	fileinfos, totalsize := ls(".")
-	fileinfos_map := map[string]string{}
+	fileinfos_map := map[string]string{} //hash to path
 	for _, fileinfo := range fileinfos {
 		if _, ok := fileinfos_map[fileinfo.Hash]; !ok {
 			fileinfos_map[fileinfo.Hash] = fileinfo.Path
 		} else {
-			log.Printf("File flagged for removal: %s\n", fileinfo.Path)
+			log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.Path, fileinfos_map[fileinfo.Hash])
 			if !dryrun {
 				os.Remove(fileinfo.Path)
 			}
