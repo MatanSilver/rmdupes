@@ -83,7 +83,9 @@ func RmDupes(dryrun bool, path string, verbose bool) {
 			}
 		}
 	}
-	log.Printf("Total space cleared: %d\n", totalsize)
+	if verbose == true {
+		log.Printf("Total space cleared: %d\n", totalsize)
+	}
 }
 
 func main() {
