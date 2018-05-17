@@ -89,13 +89,14 @@ func RmDupes(dryrun bool, path string, verbose bool) {
 func main() {
 	app := cli.NewApp()
 	app.Name = "rmdupes"
+	app.Version = "0.0.1"
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "dry-run",
 			Usage: "Only print logs of files to be deleted or errors",
 		},
 		cli.BoolFlag{
-			Name:  "verbose, v",
+			Name:  "verbose",
 			Usage: "Print out operations",
 		},
 		cli.StringFlag{
