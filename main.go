@@ -19,7 +19,7 @@ type fileinfowrapper struct {
 
 // Takes in a directory path. Recursively crawls the directory and outputs a
 // list of paths of files in that directory and subdirectories
-func ls(dir string) []fileinfowrapper {
+func ls(dir string, verbose bool) []fileinfowrapper {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if len(files) == 0 {
@@ -31,22 +31,27 @@ func ls(dir string) []fileinfowrapper {
 	for _, file := range files {
 		if file.IsDir() {
 			//if the file is a directory, recursively add the directory's contents
-			log.Printf("Recursing into %s\n", file.Name())
+			if verbose == true {
+				log.Printf("Recursing into %s\n", file.Name())
+			}
 			if file.Name() != ".git" && file.Name() != ".DS_Store" { //kindly ignore .git folder to avoid spam
-				//log.Printf("entering directory: %s\n", file.Name())
-				newfileinfos := ls(strings.Join([]string{dir, file.Name()}, "/"))
+				newfileinfos := ls(strings.Join([]string{dir, file.Name()}, "/"), verbose)
 				fileinfos = append(fileinfos, newfileinfos...)
 			}
 		} else {
 			fullpath := strings.Join([]string{dir, file.Name()}, "/")
 			if file.Size() > 10000000 {
-				log.Printf("\tSkipping large file %s\n", fullpath)
+				if verbose == true {
+					log.Printf("\tSkipping large file %s\n", fullpath)
+				}
 				break
 			}
 
 			//now we generate a hash, which might be useful for checking for
 			//duplicates
-			log.Printf("\tHashing file %s\n", fullpath)
+			if verbose == true {
+				log.Printf("\tHashing file %s\n", fullpath)
+			}
 			buff, err := ioutil.ReadFile(fullpath)
 			if err != nil {
 				log.Fatal(err)
@@ -61,15 +66,17 @@ func ls(dir string) []fileinfowrapper {
 	return fileinfos
 }
 
-func RmDupes(dryrun bool, path string) {
-	fileinfos := ls(path)
+func RmDupes(dryrun bool, path string, verbose bool) {
+	fileinfos := ls(path, verbose)
 	fileinfos_map := map[string]string{} //hash to path
 	var totalsize int64 = 0
 	for _, fileinfo := range fileinfos {
 		if _, ok := fileinfos_map[fileinfo.Hash]; !ok {
 			fileinfos_map[fileinfo.Hash] = fileinfo.Path
 		} else {
-			log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.Path, fileinfos_map[fileinfo.Hash])
+			if verbose == true {
+				log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.Path, fileinfos_map[fileinfo.Hash])
+			}
 			totalsize += fileinfo.Info.Size()
 			if !dryrun {
 				os.Remove(fileinfo.Path)
@@ -87,6 +94,10 @@ func main() {
 			Name:  "dry-run",
 			Usage: "Only print logs of files to be deleted or errors",
 		},
+		cli.BoolFlag{
+			Name:  "verbose, v",
+			Usage: "Print out operations",
+		},
 		cli.StringFlag{
 			Name:  "directory, d",
 			Usage: "Specify parent directory in which to remove duplicates",
@@ -102,7 +113,7 @@ func main() {
 	}
 	app.Usage = "Removes duplicate files by _content_"
 	app.Action = func(c *cli.Context) error {
-		RmDupes(c.Bool("dry-run"), c.String("directory"))
+		RmDupes(c.Bool("dry-run"), c.String("directory"), c.Bool("verbose"))
 		return nil
 	}
 	app.Run(os.Args)
