@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/urfave/cli"
+
 )
 
 type fileinfowrapper struct {
@@ -66,10 +67,23 @@ func ls(dir string, verbose bool) []fileinfowrapper {
 	return fileinfos
 }
 
-func RmDupes(dryrun bool, path string, verbose bool) {
+func rmworker(jobs <-chan string) {
+	for j := range jobs {
+		err := os.Remove(j)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func RmDupes(dryrun bool, path string, verbose bool, concurrency int) {
 	fileinfos := ls(path, verbose)
 	fileinfos_map := map[string]string{} //hash to path
 	var totalsize int64 = 0
+	jobs := make(chan string)
+	for i := 1; i <= concurrency; i++ {
+		go rmworker(jobs)
+	}
 	for _, fileinfo := range fileinfos {
 		if _, ok := fileinfos_map[fileinfo.Hash]; !ok {
 			fileinfos_map[fileinfo.Hash] = fileinfo.Path
@@ -78,11 +92,14 @@ func RmDupes(dryrun bool, path string, verbose bool) {
 				log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.Path, fileinfos_map[fileinfo.Hash])
 			}
 			totalsize += fileinfo.Info.Size()
+
 			if !dryrun {
-				os.Remove(fileinfo.Path)
+				jobs<-fileinfo.Path
+				//os.Remove(fileinfo.Path)
 			}
 		}
 	}
+	close(jobs)
 	if verbose == true {
 		log.Printf("Total space cleared: %d\n", totalsize)
 	}
@@ -106,6 +123,11 @@ func main() {
 			Usage: "Specify parent directory in which to remove duplicates",
 			Value: ".",
 		},
+		cli.IntFlag{
+			Name: "concurrency, c",
+			Usage: "Number of threads to run deleting files",
+			Value: 1,
+		},
 		/*
 				cli.BoolFlag{
 					Name:	"recurse|r",
@@ -116,7 +138,7 @@ func main() {
 	}
 	app.Usage = "Removes duplicate files by _content_"
 	app.Action = func(c *cli.Context) error {
-		RmDupes(c.Bool("dry-run"), c.String("directory"), c.Bool("verbose"))
+		RmDupes(c.Bool("dry-run"), c.String("directory"), c.Bool("verbose"), c.Int("concurrency"))
 		return nil
 	}
 	app.Run(os.Args)
