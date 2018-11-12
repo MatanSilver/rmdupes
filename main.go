@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/urfave/cli"
-
 )
 
 type fileinfowrapper struct {
@@ -94,7 +93,7 @@ func RmDupes(dryrun bool, path string, verbose bool, concurrency int) {
 			totalsize += fileinfo.Info.Size()
 
 			if !dryrun {
-				jobs<-fileinfo.Path
+				jobs <- fileinfo.Path
 				//os.Remove(fileinfo.Path)
 			}
 		}
@@ -124,7 +123,7 @@ func main() {
 			Value: ".",
 		},
 		cli.IntFlag{
-			Name: "concurrency, c",
+			Name:  "concurrency, c",
 			Usage: "Number of threads to run deleting files",
 			Value: 1,
 		},
