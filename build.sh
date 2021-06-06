@@ -1,1 +1,0 @@
-goimports -w . && gofmt -w . && go build -ldflags "-s -w"
