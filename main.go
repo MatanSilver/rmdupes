@@ -12,58 +12,64 @@ import (
 )
 
 type fileinfowrapper struct {
-	Info os.FileInfo
-	Path string
+	LightFileInfoWrapper lightfileinfowrapper
 	Hash string
 }
 
-// Takes in a directory path. Recursively crawls the directory and outputs a
-// list of paths of files in that directory and subdirectories
-func ls(dir string, verbose bool) []fileinfowrapper {
+type lightfileinfowrapper struct {
+	Info os.FileInfo
+	Path string
+}
+
+func filesInDirectory(dir string) []lightfileinfowrapper {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		if len(files) == 0 {
-			return []fileinfowrapper{}
+			return []lightfileinfowrapper{}
 		}
 		log.Fatalf("Error reading directory: %v\n\t%v", dir, err)
 	}
-	var fileinfos []fileinfowrapper
+	var fileinfos []lightfileinfowrapper
 	for _, file := range files {
 		if file.IsDir() {
 			//if the file is a directory, recursively add the directory's contents
-			if verbose == true {
-				log.Printf("Recursing into %s\n", file.Name())
-			}
-			if file.Name() != ".git" && file.Name() != ".DS_Store" { //kindly ignore .git folder to avoid spam
-				newfileinfos := ls(strings.Join([]string{dir, file.Name()}, "/"), verbose)
+			log.Printf("Recursing into %s\n", file.Name())
+			if file.Name() != ".git" && file.Name() != ".DS_Store" { // ignore .git folder to avoid spam
+				newfileinfos := filesInDirectory(strings.Join([]string{dir, file.Name()}, "/"))
 				fileinfos = append(fileinfos, newfileinfos...)
 			}
 		} else {
 			fullpath := strings.Join([]string{dir, file.Name()}, "/")
 			if file.Size() > 10000000 {
-				if verbose == true {
-					log.Printf("\tSkipping large file %s\n", fullpath)
-				}
+				log.Printf("\tSkipping large file %s\n", fullpath)
 				break
 			}
-
-			//now we generate a hash, which might be useful for checking for
-			//duplicates
-			if verbose == true {
-				log.Printf("\tHashing file %s\n", fullpath)
-			}
-			buff, err := ioutil.ReadFile(fullpath)
-			if err != nil {
-				log.Fatal(err)
-			}
-			hasher := sha256.New()
-			hasher.Write(buff)
-			//TODO possibly remove use of hex and just put to []byte
-			fileinfo := fileinfowrapper{file, fullpath, hex.EncodeToString(hasher.Sum(nil))}
+			fileinfo := lightfileinfowrapper{file, fullpath}
 			fileinfos = append(fileinfos, fileinfo)
 		}
 	}
 	return fileinfos
+}
+
+func computeFileHashes(files []lightfileinfowrapper) []fileinfowrapper {
+	var fileinfos []fileinfowrapper
+	for _, file := range files {
+		log.Printf("\tHashing file %s\n", file.Path)
+		fileinfo := computeFileHash(file)
+		fileinfos = append(fileinfos, fileinfo)
+	}
+	return fileinfos
+}
+
+func computeFileHash(file lightfileinfowrapper) fileinfowrapper {
+	buff, err := ioutil.ReadFile(file.Path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	hasher := sha256.New()
+	hasher.Write(buff)
+	fileinfo := fileinfowrapper{file,hex.EncodeToString(hasher.Sum(nil))}
+	return fileinfo
 }
 
 func rmworker(jobs <-chan string) {
@@ -75,8 +81,8 @@ func rmworker(jobs <-chan string) {
 	}
 }
 
-func RmDupes(dryrun bool, path string, verbose bool, concurrency int) {
-	fileinfos := ls(path, verbose)
+func RmDupes(dryrun bool, path string, concurrency int) {
+	fileinfos := computeFileHashes(filesInDirectory(path))
 	fileinfos_map := map[string]string{} //hash to path
 	var totalsize int64 = 0
 	jobs := make(chan string)
@@ -85,23 +91,19 @@ func RmDupes(dryrun bool, path string, verbose bool, concurrency int) {
 	}
 	for _, fileinfo := range fileinfos {
 		if _, ok := fileinfos_map[fileinfo.Hash]; !ok {
-			fileinfos_map[fileinfo.Hash] = fileinfo.Path
+			fileinfos_map[fileinfo.Hash] = fileinfo.LightFileInfoWrapper.Path
 		} else {
-			if verbose == true {
-				log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.Path, fileinfos_map[fileinfo.Hash])
-			}
-			totalsize += fileinfo.Info.Size()
+			log.Printf("File flagged for removal: %s\n\tExisting file: %s\n", fileinfo.LightFileInfoWrapper.Path, fileinfos_map[fileinfo.Hash])
+			totalsize += fileinfo.LightFileInfoWrapper.Info.Size()
 
 			if !dryrun {
-				jobs <- fileinfo.Path
+				jobs <- fileinfo.LightFileInfoWrapper.Path
 				//os.Remove(fileinfo.Path)
 			}
 		}
 	}
 	close(jobs)
-	if verbose == true {
-		log.Printf("Total space cleared: %d\n", totalsize)
-	}
+	log.Printf("Total space cleared: %d\n", totalsize)
 }
 
 func main() {
@@ -112,10 +114,6 @@ func main() {
 		cli.BoolFlag{
 			Name:  "dry-run",
 			Usage: "Only print logs of files to be deleted or errors",
-		},
-		cli.BoolFlag{
-			Name:  "verbose",
-			Usage: "Print out operations",
 		},
 		cli.StringFlag{
 			Name:  "directory, d",
@@ -137,7 +135,7 @@ func main() {
 	}
 	app.Usage = "Removes duplicate files by _content_"
 	app.Action = func(c *cli.Context) error {
-		RmDupes(c.Bool("dry-run"), c.String("directory"), c.Bool("verbose"), c.Int("concurrency"))
+		RmDupes(c.Bool("dry-run"), c.String("directory"), c.Int("concurrency"))
 		return nil
 	}
 	app.Run(os.Args)

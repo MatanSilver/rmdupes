@@ -8,9 +8,9 @@ import (
 )
 
 func TestLSDupes(t *testing.T) {
-	os.Mkdir("tmp", 0640)
-	os.Mkdir("tmp/subdir", 0640)
-	err := ioutil.WriteFile("tmp/file1", []byte("this is a test"), 0640)
+	os.Mkdir("tmp", 0777)
+	os.Mkdir("tmp/subdir", 0777)
+	err := ioutil.WriteFile("tmp/file1", []byte("this is a test"), 0777)
 	if err != nil {
 		log.Fatal(err)
 	}
